@@ -46,7 +46,7 @@ impl Field {
                                  -> P<ast::Expr> {
         if length == 1 {
             let byte_shift = (7 - start % 8) as usize;
-            quote_expr!(cx, (self.data[($start/8) as usize] & (0x1 << $byte_shift)) != 0)
+            quote_expr!(cx, (buff[($start/8) as usize + self.offset] & (0x1 << $byte_shift)) != 0)
         } else {
             let mut value_expr = None;
             let mut bits_to_get = length;
@@ -57,7 +57,7 @@ impl Field {
                 let mask = 0xFFu8 >> (8 - can_get) as usize;
                 let byte_shift = (8 - can_get - (bit_offset % 8) as u8) as usize;
                 let bits_expr =
-                    quote_expr!(cx, ((self.data[$index] >> $byte_shift) & $mask) as $value_type);
+                    quote_expr!(cx, ((buff[$index + self.offset] >> $byte_shift) & $mask) as $value_type);
 
                 value_expr = match value_expr {
                     Some(expr) => {
@@ -87,8 +87,8 @@ impl Field {
         if length == 1 {
             let mask = 0x1u8 << (7 - start % 8) as usize;
             let index = (start / 8) as usize;
-            quote_stmt!(cx, if value {self.data[$index] |= $mask}
-                            else {self.data[$index] &= !($mask)})
+            quote_stmt!(cx, if value {buff[$index  + self.offset] |= $mask}
+                            else {buff[$index + self.offset] &= !($mask)})
                 .unwrap()
         } else {
             let mut stmts = Vec::new();
@@ -110,14 +110,14 @@ impl Field {
                 // negative value means we want shift to the left
                 if value_shift > 0 {
                     let value_shift = value_shift as usize;
-                    stmts.push(quote_stmt!(cx, self.data[$index] =
-                        (self.data[$index] & !$mask) |
+                    stmts.push(quote_stmt!(cx, buff[$index + self.offset] =
+                        (buff[$index + self.offset] & !$mask) |
                         ((value >> $value_shift) as u8)& $mask)
                                    .unwrap());
                 } else {
                     let value_shift = (-value_shift) as usize;
-                    stmts.push(quote_stmt!(cx, self.data[$index] =
-                        (self.data[$index] & !$mask) |
+                    stmts.push(quote_stmt!(cx, buff[$index + self.offset] =
+                        (buff[$index + self.offset] & !$mask) |
                         ((value << $value_shift) as u8)& $mask)
                                    .unwrap());
                 }
@@ -160,8 +160,7 @@ impl Field {
 
                 let getter = quote_item!(cx,
                    impl $struct_ident {
-                       #[inline]
-                       fn $getter_ident(&self) -> $value_type {
+                       fn $getter_ident(&self, buff: &[u8]) -> $value_type {
                           $getter_expr
                        }
                    }
@@ -190,8 +189,7 @@ impl Field {
 
                 let setter = quote_item!(cx,
                    impl $struct_ident {
-                       #[inline]
-                       fn $setter_ident(&mut self, value: $value_type) {
+                       fn $setter_ident(&mut self, buff: &mut [u8], value: $value_type) {
                           $setter_stmt
                        }
                    }
@@ -208,8 +206,7 @@ impl Field {
                 let getter_expr = Field::gen_single_value_get_expr(cx, &value_type, start, length);
                 let getter = quote_item!(cx,
                    impl $struct_ident {
-                       #[inline]
-                       fn $getter_ident(&self) -> $value_type {
+                       fn $getter_ident(&self, buff: &[u8]) -> $value_type {
                           $getter_expr
                        }
                    }
@@ -225,8 +222,7 @@ impl Field {
                                                                    length);
                 let setter = quote_item!(cx,
                    impl $struct_ident {
-                       #[inline]
-                       fn $setter_ident(&mut self, value: $value_type) {
+                       fn $setter_ident(&mut self, buff: &mut [u8], value: $value_type) {
                           $setter_stmt
                        }
                    }
@@ -373,21 +369,7 @@ fn expand_bitfield(cx: &mut ExtCtxt,
         }
     };
 
-    let mut items = Vec::with_capacity(fields.len() * 2 + 2);
-    let bit_length = fields.iter().fold(0, |a, b| a + b.bit_len());
-    let byte_length = ((bit_length + 7) / 8) as usize;
-    let struct_decl = quote_item!(cx, struct $struct_ident { data: [u8; $byte_length]};).unwrap();
-    items.push(struct_decl);
-
-    let method_new = quote_item!(cx,
-       impl $struct_ident {
-           fn new(data: [u8; $byte_length]) -> $struct_ident {
-               $struct_ident { data: data}
-           }
-        }
-    )
-                         .unwrap();
-    items.push(method_new);
+    let mut items = Vec::with_capacity(fields.len() * 2);
 
     let mut field_start = 0;
     for field in fields {
@@ -401,5 +383,5 @@ fn expand_bitfield(cx: &mut ExtCtxt,
 
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
-    reg.register_macro("bitfield", expand_bitfield);
+    reg.register_macro("netbits", expand_bitfield);
 }
