@@ -1,7 +1,19 @@
-rust-bitfield
-=============
+net-bits
+========
 
-[![Build Status](https://travis-ci.org/dzamlo/rust-bitfield.svg?branch=master)](https://travis-ci.org/dzamlo/rust-bitfield)
+Blatantly forked from dzamlo's [rust-bitfield](https://github.com/dzamlo/rust-bitfield)
+
+Modified
+--------
+
+I've modified rust-bitfield a tiny bit to fit with [chucker](https://github.com/tstuij/chucker), my toy/pet network
+project, which has some wonky requirements. It seems a bit silly to somehow
+merge this with rust-bitfields, as I don't think the changes contribute
+anything to the common good. The description below still stands:
+
+
+Original text
+------------
 
 This project provides a procedural macro to generate bitfield-like struct.
 
@@ -21,14 +33,11 @@ headers of some network protocols or some low-level protocols.
 Usage
 -----
 
-To use this macro in a cargo enabled project, add the following to your 
-Cargo.toml:
-```toml
-[dependencies.bitfield]
-git = "https://github.com/dzamlo/rust-bitfield"
-```
+To use with [chucker](https://github.com/tstuij/chucker).
 
-See the [examples folder](examples) for examples of the use the macro.
+Don't look at the [examples folder](examples) for examples of the use the macro.
+Those examples were meant for rust-bitfields and are terribly broken
+at the moment.
 
 ## License
 

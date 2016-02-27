@@ -1,12 +1,12 @@
 [package]
 
-name = "bitfield"
+name = "net-bits"
 version = "0.0.2"
 authors = ["Loïc Damien <loic.damien@dzamlo.ch>"]
-repository = "https://github.com/dzamlo/rust-bitfield"
+repository = "https://github.com/stuij/net-bits"
 license = "MIT OR Apache-2.0"
 description = "A procedural macro to generate bitfield-like stuct"
 
 [lib]
-name = "bitfield"
+name = "net_bits"
 plugin = true
