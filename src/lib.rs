@@ -46,7 +46,7 @@ impl Field {
                                  -> P<ast::Expr> {
         if length == 1 {
             let byte_shift = (7 - start % 8) as usize;
-            quote_expr!(cx, (buff[($start/8) as usize + self.offset] & (0x1 << $byte_shift)) != 0)
+            quote_expr!(cx, (buff[($start/8) as usize] & (0x1 << $byte_shift)) != 0)
         } else {
             let mut value_expr = None;
             let mut bits_to_get = length;
@@ -57,7 +57,7 @@ impl Field {
                 let mask = 0xFFu8 >> (8 - can_get) as usize;
                 let byte_shift = (8 - can_get - (bit_offset % 8) as u8) as usize;
                 let bits_expr =
-                    quote_expr!(cx, ((buff[$index + self.offset] >> $byte_shift) & $mask) as $value_type);
+                    quote_expr!(cx, ((buff[$index] >> $byte_shift) & $mask) as $value_type);
 
                 value_expr = match value_expr {
                     Some(expr) => {
@@ -84,8 +84,8 @@ impl Field {
         if length == 1 {
             let mask = 0x1u8 << (7 - start % 8) as usize;
             let index = (start / 8) as usize;
-            P(quote_stmt!(cx, if value {buff[$index  + self.offset] |= $mask}
-                            else {buff[$index + self.offset] &= !($mask)})
+            P(quote_stmt!(cx, if value {buff[$index] |= $mask}
+                            else {buff[$index] &= !($mask)})
                 .unwrap())
         } else {
             let mut stmts = Vec::new();
@@ -107,14 +107,14 @@ impl Field {
                 // negative value means we want shift to the left
                 if value_shift > 0 {
                     let value_shift = value_shift as usize;
-                    stmts.push(quote_stmt!(cx, buff[$index + self.offset] =
-                        (buff[$index + self.offset] & !$mask) |
+                    stmts.push(quote_stmt!(cx, buff[$index] =
+                        (buff[$index] & !$mask) |
                         ((value >> $value_shift) as u8)& $mask)
                                    .unwrap());
                 } else {
                     let value_shift = (-value_shift) as usize;
-                    stmts.push(quote_stmt!(cx, buff[$index + self.offset] =
-                        (buff[$index + self.offset] & !$mask) |
+                    stmts.push(quote_stmt!(cx, buff[$index] =
+                        (buff[$index] & !$mask) |
                         ((value << $value_shift) as u8)& $mask)
                                    .unwrap());
                 }
@@ -233,6 +233,10 @@ impl Field {
         methods
     }
 }
+
+// fn make_print_fn(struct_ident: ast::Ident, fields &vec<Field>>) -> P<ast::Item> {
+    
+// }
 
 /// Return the smaller bool or unsigned int type than can hold an amount of bits. Also return the size
 /// of the type in bits.
@@ -373,6 +377,8 @@ fn expand_bitfield(cx: &mut ExtCtxt,
         items.extend(field.to_methods(cx, struct_ident, field_start));
         field_start += field.bit_len();
     }
+
+    // items.push(make_print_fn(struct_ident, &fields));
 
     let s = SmallVector::many(items);
     MacEager::items(s)
