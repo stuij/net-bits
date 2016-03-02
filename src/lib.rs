@@ -157,7 +157,7 @@ impl Field {
 
                 let getter = quote_item!(cx,
                    impl $struct_ident {
-                       fn $getter_ident(&self, buff: &[u8]) -> $value_type {
+                       pub fn $getter_ident(&self, buff: &[u8]) -> $value_type {
                           $getter_expr
                        }
                    }
@@ -186,7 +186,7 @@ impl Field {
 
                 let setter = quote_item!(cx,
                    impl $struct_ident {
-                       fn $setter_ident(&mut self, buff: &mut [u8], value: $value_type) {
+                       pub fn $setter_ident(&mut self, buff: &mut [u8], value: $value_type) {
                           $setter_stmt
                        }
                    }
@@ -203,7 +203,7 @@ impl Field {
                 let getter_expr = Field::gen_single_value_get_expr(cx, &value_type, start, length);
                 let getter = quote_item!(cx,
                    impl $struct_ident {
-                       fn $getter_ident(&self, buff: &[u8]) -> $value_type {
+                       pub fn $getter_ident(&self, buff: &[u8]) -> $value_type {
                           $getter_expr
                        }
                    }
@@ -219,7 +219,7 @@ impl Field {
                                                                    length);
                 let setter = quote_item!(cx,
                    impl $struct_ident {
-                       fn $setter_ident(&mut self, buff: &mut [u8], value: $value_type) {
+                       pub fn $setter_ident(&mut self, buff: &mut [u8], value: $value_type) {
                           $setter_stmt
                        }
                    }
