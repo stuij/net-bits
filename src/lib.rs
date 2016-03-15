@@ -165,6 +165,24 @@ impl Field {
                                  .unwrap();
                 methods.push(getter);
 
+                //--------------
+
+                let buf_start = start as usize;
+                let buf_end = buf_start + count;
+                let getter_slice_name = "get_".to_owned() + &name[..] + "_slice";
+                let getter_slice_ident = token::str_to_ident(&getter_slice_name[..]);
+                let getter_slice = quote_item!(cx,
+                    impl $struct_ident {
+                        pub fn $getter_slice_ident<'a>(&'a self, buff: &'a [u8]) -> &[u8] {
+                            &buff[$buf_start..$buf_end]
+                        }
+                    }
+                ).unwrap();
+
+                methods.push(getter_slice);
+
+                //--------------
+
                 let setter_name = "set_".to_owned() + &name[..];
                 let setter_ident = token::str_to_ident(&setter_name[..]);
                 let mut element_setter_stmts = Vec::new();
@@ -234,9 +252,50 @@ impl Field {
     }
 }
 
-// fn make_print_fn(struct_ident: ast::Ident, fields &vec<Field>>) -> P<ast::Item> {
-    
-// }
+
+fn make_print_fn(cx: &mut ExtCtxt, struct_ident: ast::Ident,
+                 write_imm: ast::Ident, write_arr: ast::Ident,
+                 fields: &Vec<Field>) -> P<ast::Item> {
+
+    let mut stmts = Vec::with_capacity(fields.len());
+
+    // let out = "f".to_owned();
+    let buff = token::str_to_ident("buff");
+    for field in fields {
+        match field {
+            &Field::ArrayField {ref name, count, element_length} => {
+                let getter_name = "get_".to_owned() + &name[..] + "_slice";
+                let getter_ident = token::str_to_ident(&getter_name[..]);
+
+                stmts.push(quote_stmt!(cx,
+                    $write_arr($name, self.$getter_ident(buff));
+                ).unwrap());
+            }
+            &Field::ScalarField{ref name, length} => {
+                let getter_name = "get_".to_owned() + &name[..];
+                let getter_ident = token::str_to_ident(&getter_name[..]);
+
+                stmts.push(quote_stmt!(cx,
+                    $write_imm($name, self.$getter_ident(buff) as u64);
+                ).unwrap());
+            }
+        }
+    }
+
+    let block = cx.block(DUMMY_SP, stmts, None);
+    let expr = cx.expr(DUMMY_SP, ast::ExprKind::Block(block));
+    let stmt = P(cx.stmt_expr(expr));
+
+    quote_item!(cx,
+        impl $struct_ident {
+            pub fn print_fields(&self, buff: &[u8]) {
+                $stmt
+            }
+        }
+    ).unwrap()
+}
+
+
 
 /// Return the smaller bool or unsigned int type than can hold an amount of bits. Also return the size
 /// of the type in bits.
@@ -357,6 +416,32 @@ fn expand_bitfield(cx: &mut ExtCtxt,
         e.emit();
     }
 
+    let write_imm = match parser.parse_ident() {
+        Ok(ident) => ident,
+        Err(mut e) => {
+            e.emit();
+            parser.abort_if_errors();
+            unreachable!();
+        }
+    };
+
+    if let Err(mut e) = parser.expect(&token::Comma) {
+        e.emit();
+    }
+
+    let write_arr = match parser.parse_ident() {
+        Ok(ident) => ident,
+        Err(mut e) => {
+            e.emit();
+            parser.abort_if_errors();
+            unreachable!();
+        }
+    };
+
+    if let Err(mut e) = parser.expect(&token::Comma) {
+        e.emit();
+    }
+
     let sep = SeqSep {
         sep: Some(token::Comma),
         trailing_sep_allowed: true,
@@ -370,15 +455,15 @@ fn expand_bitfield(cx: &mut ExtCtxt,
         }
     };
 
-    let mut items = Vec::with_capacity(fields.len() * 2);
+    let mut items = Vec::with_capacity(fields.len() * 3 + 1);
+
+    items.push(make_print_fn(cx, struct_ident, write_imm, write_arr, &fields));
 
     let mut field_start = 0;
     for field in fields {
         items.extend(field.to_methods(cx, struct_ident, field_start));
         field_start += field.bit_len();
     }
-
-    // items.push(make_print_fn(struct_ident, &fields));
 
     let s = SmallVector::many(items);
     MacEager::items(s)
