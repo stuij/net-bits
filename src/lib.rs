@@ -166,7 +166,7 @@ impl Field {
                                  .unwrap();
                 methods.push(getter);
 
-                //--------------
+                //-------------- get slice
 
                 let buf_start = start as usize;
                 let buf_end = buf_start + count;
@@ -181,6 +181,22 @@ impl Field {
                 ).unwrap();
 
                 methods.push(getter_slice);
+
+                //-------------- get mut slice
+
+                let getter_mut_slice_name = "get_mut_".to_owned() + &name[..] + "_slice";
+                let getter_mut_slice_ident = token::str_to_ident(
+                    &getter_mut_slice_name[..]);
+
+                let getter_mut_slice = quote_item!(cx,
+                    impl $struct_ident {
+                        pub fn $getter_mut_slice_ident<'a>(&'a self, buff: &mut 'a [u8]) -> &mut [u8] {
+                            &mut buff[$buf_start..$buf_end]
+                        }
+                    }
+                ).unwrap();
+
+                methods.push(getter_mut_slice);
 
                 //--------------
 
