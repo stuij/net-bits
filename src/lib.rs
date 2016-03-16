@@ -21,6 +21,7 @@ use syntax::util::small_vector::SmallVector;
 enum Field {
     ArrayField {
         name: String,
+        print_fn: Option<ast::Ident>,
         count: usize,
         element_length: u8,
     },
@@ -137,7 +138,7 @@ impl Field {
         let mut methods = vec![];
 
         match *self {
-            Field::ArrayField{ref name, count, element_length} => {
+            Field::ArrayField{ref name, count, element_length, ..} => {
 
                 let (element_type, value_type_length) = size_to_ty(cx, element_length).unwrap();
                 let value_type = make_array_ty(cx, &element_type, count);
@@ -259,19 +260,20 @@ fn make_print_fn(cx: &mut ExtCtxt, struct_ident: ast::Ident,
 
     let mut stmts = Vec::with_capacity(fields.len());
 
-    // let out = "f".to_owned();
-    let buff = token::str_to_ident("buff");
     for field in fields {
         match field {
-            &Field::ArrayField {ref name, count, element_length} => {
+            &Field::ArrayField {ref name, print_fn, ..} => {
                 let getter_name = "get_".to_owned() + &name[..] + "_slice";
                 let getter_ident = token::str_to_ident(&getter_name[..]);
-
+                let print_ident = match print_fn {
+                    Some(fn_ident) => fn_ident,
+                    None => write_arr
+                };
                 stmts.push(quote_stmt!(cx,
-                    $write_arr($name, self.$getter_ident(buff));
+                    $print_ident($name, self.$getter_ident(buff));
                 ).unwrap());
             }
-            &Field::ScalarField{ref name, length} => {
+            &Field::ScalarField{ref name, ..} => {
                 let getter_name = "get_".to_owned() + &name[..];
                 let getter_ident = token::str_to_ident(&getter_name[..]);
 
@@ -375,10 +377,24 @@ fn parse_field(parser: &mut Parser) -> Field {
             count = 1
         }
 
+        let print_fn = if parser.eat(&token::Semi) {
+            match parser.parse_ident() {
+                Ok(ident) => Some(ident),
+                Err(mut e) => {
+                    e.emit();
+                    parser.abort_if_errors();
+                    unreachable!();
+                }
+            }
+        } else {
+            None
+        };
+
         expect_token!(parser, &token::CloseDelim(token::Bracket));
 
         Field::ArrayField {
             name: name,
+            print_fn: print_fn,
             element_length: element_length as u8,
             count: count as usize,
         }
